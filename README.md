@@ -1,5 +1,9 @@
 # 📊 Dashboard Monitoring PO
 
+## 📸 Preview
+
+![Dashboard Preview](Dashboard_Preview.jpg)
+
 Dashboard berbasis HTML + Google Apps Script untuk monitoring Purchase Order (PO) secara real-time langsung dari Google Spreadsheet.
 
 ---
