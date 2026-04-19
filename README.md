@@ -89,7 +89,7 @@ Field yang digunakan:
 ### 1. Lokal (Testing)
 
 ```bash
-open dashboard_po_live.html
+index.html
 ```
 
 atau double click file HTML.
