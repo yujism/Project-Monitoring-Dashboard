@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Monitoring PO Khusus</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:100vh;font-size:14px}
+.header{background:#1a1a2e;color:#fff;padding:16px 28px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.header-left h1{font-size:16px;font-weight:600;letter-spacing:.2px}
+.header-left span{font-size:11px;color:#8892a4;display:block;margin-top:2px}
+.refresh-btn{padding:7px 16px;border-radius:7px;border:1px solid #3a4a6b;background:transparent;color:#8892a4;cursor:pointer;font-size:12px;transition:all .15s}
+.refresh-btn:hover{background:#2a3a5b;color:#fff}
+.main{padding:20px 24px;max-width:1400px;margin:0 auto}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px}
+.metric{background:#fff;border-radius:10px;padding:14px 16px;border:1px solid #e8ebf0}
+.metric .lbl{font-size:11px;color:#8892a4;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+.metric .val{font-size:24px;font-weight:600}
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+@media(max-width:640px){.charts-row{grid-template-columns:1fr}}
+.chart-card{background:#fff;border-radius:10px;padding:16px;border:1px solid #e8ebf0}
+.chart-card-title{font-size:11px;font-weight:600;color:#8892a4;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.legend-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:#555}
+.legend-dot{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center}
+select,input[type=text]{padding:7px 11px;border:1px solid #dde1ea;border-radius:7px;font-size:12px;color:#1a1a2e;background:#fff;outline:none}
+select:focus,input:focus{border-color:#4f7ef8}
+.ch-btns{display:flex;flex-wrap:wrap;gap:5px}
+.ch-btn{font-size:11px;font-weight:600;padding:4px 11px;border-radius:20px;border:1.5px solid #dde1ea;background:#fff;color:#555;cursor:pointer;transition:all .12s}
+.ch-btn.active{color:#fff}
+.tbl-card{background:#fff;border-radius:10px;border:1px solid #e8ebf0;overflow:hidden}
+.tbl-head{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid #e8ebf0}
+.tbl-head h2{font-size:13px;font-weight:600}
+.tbl-count{font-size:11px;color:#8892a4}
+.tbl-scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:#f7f8fa;padding:9px 13px;text-align:left;font-weight:600;font-size:10px;color:#8892a4;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid #e8ebf0;white-space:nowrap}
+tbody tr{border-bottom:1px solid #f0f2f5;cursor:pointer;transition:background .1s}
+tbody tr:hover{background:#f7f9ff}
+.stage-lbl:hover{background:#f7f9ff}
+tbody tr:last-child{border-bottom:none}
+td{padding:9px 13px;vertical-align:middle}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap}
+.bf{background:#e8f5e9;color:#2e7d32}
+.bc{background:#fdecea;color:#c62828}
+.bp{background:#e3f2fd;color:#1565c0}
+.bpa{background:#fff3e0;color:#e65100}
+.bd{background:#f3e5f5;color:#6a1b9a}
+.bs{background:#fce4ec;color:#880e4f}
+.bdr{background:#f5f5f5;color:#616161}
+.bw{background:#fff8e1;color:#f57f17}
+.bcl{background:#efebe9;color:#4e342e}
+.bdelay{background:#fdecea;color:#c62828}
+.bontrack{background:#e8f5e9;color:#2e7d32}
+.bdone{background:#e8f5e9;color:#2e7d32}
+.bprog{background:#e3f2fd;color:#1565c0}
+.bwait{background:#fff3e0;color:#e65100}
+.pag{display:flex;align-items:center;justify-content:space-between;padding:10px 18px;border-top:1px solid #e8ebf0;font-size:12px;color:#8892a4}
+.pag-btns{display:flex;gap:4px}
+.pb{padding:4px 9px;border:1px solid #dde1ea;border-radius:5px;cursor:pointer;background:#fff;font-size:11px;color:#555}
+.pb:hover:not(:disabled){background:#f0f2f5}
+.pb:disabled{opacity:.35;cursor:not-allowed}
+.pb.cur{background:#1a1a2e;color:#fff;border-color:#1a1a2e}
+.state{text-align:center;padding:48px;color:#b0b8c5;font-size:13px}
+.err{color:#c62828}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.open{display:flex}
+.modal{background:#fff;border-radius:14px;width:100%;max-width:660px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal-hd{padding:16px 20px;border-bottom:1px solid #e8ebf0;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.modal-hd h3{font-size:15px;font-weight:700}
+.modal-sub{font-size:11px;color:#8892a4;margin-top:2px}
+.close-x{background:none;border:none;font-size:20px;cursor:pointer;color:#aaa;line-height:1}
+.modal-bd{padding:18px 20px;overflow-y:auto;flex:1}
+.info-g{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:16px}
+.ii .il{font-size:10px;color:#8892a4;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
+.ii .iv{font-size:13px;font-weight:500}
+.reason-box{background:#f7f8fa;border-radius:8px;padding:14px;border:1px solid #e8ebf0}
+.reason-box h5{font-size:10px;color:#8892a4;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;font-weight:600}
+.re{padding:7px 10px;margin-bottom:7px;border-left:3px solid #4f7ef8;background:#fff;border-radius:0 6px 6px 0;font-size:12px;line-height:1.55;color:#333;white-space:pre-wrap;word-break:break-word}
+.re:last-child{margin-bottom:0}
+.no-r{font-size:12px;color:#b0b8c5;font-style:italic}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>Dashboard Monitoring PO Khusus</h1>
+    <span id="db-meta">Memuat data...</span>
+  </div>
+  <button class="refresh-btn" onclick="loadData()">&#8635; Refresh data</button>
+</div>
+
+<div class="main">
+  <div class="summary-grid" id="sum-grid">
+    <div class="metric"><div class="lbl">Total PO</div><div class="val" id="s-total">—</div></div>
+    <div class="metric"><div class="lbl">On-going</div><div class="val" style="color:#1565c0" id="s-ongoing">—</div></div>
+    <div class="metric"><div class="lbl">Finished</div><div class="val" style="color:#2e7d32" id="s-done">—</div></div>
+    <div class="metric"><div class="lbl">On Track</div><div class="val" style="color:#2e7d32" id="s-ontrack">—</div></div>
+    <div class="metric"><div class="lbl">Delay</div><div class="val" style="color:#c62828" id="s-delay">—</div></div>
+    <div class="metric"><div class="lbl">Total Qty (Dus)</div><div class="val" id="s-qty">—</div></div>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-card-title">PO per sales channel</div>
+      <div class="legend-row" id="leg-ch"></div>
+      <div style="position:relative;width:100%;height:210px">
+        <canvas id="chartCh" role="img" aria-label="Bar chart jumlah PO per sales channel">Breakdown PO per channel.</canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">PO per stage</div>
+      <div class="legend-row" id="leg-st"></div>
+      <div style="position:relative;width:100%;height:210px">
+        <canvas id="chartSt" role="img" aria-label="Donut chart jumlah PO per stage">Breakdown PO per stage.</canvas>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:14px">
+    <div class="chart-card">
+      <div class="chart-card-title">On track vs delay per sales channel</div>
+      <div style="display:flex;gap:16px;margin-bottom:10px" id="leg-pareto">
+        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555"><span style="width:9px;height:9px;border-radius:2px;background:#2e7d32;display:inline-block"></span>On track</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555"><span style="width:9px;height:9px;border-radius:2px;background:#c62828;display:inline-block"></span>Delay</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555"><span style="width:9px;height:9px;border-radius:2px;background:#d0d0d0;display:inline-block"></span>Belum terklasifikasi</span>
+      </div>
+      <div style="position:relative;width:100%;height:240px">
+        <canvas id="chartPareto" role="img" aria-label="Stacked bar chart on track vs delay per sales channel">On track vs delay per channel.</canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="filters">
+    <div class="ch-btns" id="ch-btns"></div>
+    <input type="text" id="search" placeholder="Cari NO PO / Customer...">
+    <div style="position:relative;display:inline-block" id="stage-dd-wrap">
+      <button id="stage-dd-btn" onclick="toggleStageDD()" style="font-size:12px;padding:7px 11px;border:1px solid #dde1ea;border-radius:7px;background:#fff;color:#1a1a2e;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;min-width:140px;justify-content:space-between">
+        <span id="stage-dd-label">Semua Stage</span><span style="font-size:10px;color:#aaa">&#9660;</span>
+      </button>
+      <div id="stage-dd-menu" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:200;background:#fff;border:1px solid #dde1ea;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);min-width:220px;padding:6px 0;max-height:280px;overflow-y:auto">
+        <div style="padding:6px 12px;border-bottom:1px solid #f0f2f5;display:flex;gap:8px">
+          <button onclick="selectAllStages()" style="font-size:11px;color:#4f7ef8;background:none;border:none;cursor:pointer;padding:0">Pilih Semua</button>
+          <span style="color:#ddd">|</span>
+          <button onclick="clearAllStages()" style="font-size:11px;color:#888;background:none;border:none;cursor:pointer;padding:0">Reset</button>
+        </div>
+        <div id="stage-dd-items"></div>
+      </div>
+    </div>
+    <select id="pareto-sel">
+      <option value="">Semua Status</option>
+      <option>ON TRACK</option>
+      <option>DELAY</option>
+    </select>
+    <select id="order-sel">
+      <option value="">Semua Order</option>
+      <option>Done</option>
+      <option>Progress</option>
+      <option>Waiting</option>
+    </select>
+  </div>
+  <div class="filters" style="margin-top:-4px;margin-bottom:12px">
+    <span style="font-size:12px;color:#8892a4;font-weight:500;white-space:nowrap">Revisi Stuffing:</span>
+    <input type="date" id="date-from">
+    <span style="font-size:12px;color:#8892a4">s/d</span>
+    <input type="date" id="date-to">
+    <button id="date-reset-btn" onclick="clearDates()" style="font-size:12px;padding:6px 12px;border:1px solid #dde1ea;border-radius:7px;background:#fff;color:#888;cursor:pointer">Reset</button>
+  </div>
+
+  <div class="tbl-card">
+    <div class="tbl-head">
+      <h2 id="tbl-title">Semua PO</h2>
+      <span class="tbl-count" id="tbl-count">Klik baris untuk detail</span>
+    </div>
+    <div class="tbl-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>NO PO</th><th>Channel</th><th>Customer</th>
+            <th>Stuffing Awal</th><th>Revisi Stuffing</th>
+            <th style="text-align:right">Qty PO (Dus)</th>
+            <th style="text-align:right">Qty Delv (Dus)</th>
+            <th>Stage</th><th>Status</th><th>Order</th><th>Reason</th>
+          </tr>
+        </thead>
+        <tbody id="tbl-body">
+          <tr><td colspan="11" class="state">Memuat data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pag" id="pag"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-overlay" onclick="closeMod(event)">
+  <div class="modal">
+    <div class="modal-hd">
+      <div>
+        <h3 id="m-po"></h3>
+        <div class="modal-sub" id="m-ch"></div>
+      </div>
+      <button class="close-x" onclick="document.getElementById('modal-overlay').classList.remove('open')">&#x2715;</button>
+    </div>
+    <div class="modal-bd" id="m-body"></div>
+  </div>
+</div>
+
+<script>
+const API_URL = 'https://script.google.com/macros/s/AKfycbyo5y8mS6FJC8UY5UHnW_uD4QnjqceRhjUgbctUz7N4srKb6-L_BkmHe6hhIMWzfKj3eA/exec';
+
+const CH_COL = {MT:'#1565c0',IBD:'#6a1b9a',GT:'#2e7d32',CORTEZ:'#c62828',OSS:'#e65100','PORTO X':'#4e342e'};
+const STAGE_COL = {'5. FINISHED':'#2e7d32','6. FINISHED':'#1b5e20','5. CANCEL':'#c62828','5. CLOSED WITH OUTSTANDING':'#795548','4. READY DEPO':'#6a1b9a','5. READY DEPO':'#8e24aa','4. PARTIAL':'#e65100','2. PROSES':'#1565c0','1. SM':'#c2185b','0. DRAFT INQUIRY':'#757575','PENDING':'#f9a825'};
+const STAGE_BADGE = {'5. FINISHED':'bf','6. FINISHED':'bf','5. CANCEL':'bc','5. CLOSED WITH OUTSTANDING':'bcl','4. READY DEPO':'bd','5. READY DEPO':'bd','4. PARTIAL':'bpa','2. PROSES':'bp','1. SM':'bs','0. DRAFT INQUIRY':'bdr','PENDING':'bw'};
+
+let ALL = [], filtered = [], curCh = '', curPage = 1, perPage = 30, chartCh = null, chartSt = null, chartPareto = null;
+
+function parseSheetDate(val) {
+  if (val === null || val === undefined || val === '') return null;
+  // Excel serial number (e.g. 46114)
+  if (typeof val === 'number' && val > 1000) {
+    const d = new Date((val - 25569) * 86400 * 1000);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const s = String(val).trim();
+  if (!s) return null;
+  // ISO string from Apps Script: "2025-01-02T17:00:00.000Z"
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  // Numeric serial as string
+  if (/^\d{5,6}$/.test(s)) {
+    const d = new Date((parseInt(s) - 25569) * 86400 * 1000);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  // Other formats: "3-Jan-2025", "30-Des-2024", etc.
+  const d = new Date(s.replace(/Des/i,'Dec').replace(/Agu/i,'Aug').replace(/Okt/i,'Oct').replace(/Mei/i,'May'));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function formatDate(val) {
+  const d = parseSheetDate(val);
+  if (!d) return String(val || '-');
+  return d.toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric'});
+}
+
+function groupByPO(rows) {
+  const map = {};
+  rows.forEach(r => {
+    const ch = (r['CHANNEL'] || '').trim();
+    const po = (r['NO PO'] || '').trim();
+    if (!ch || !po) return;
+    const key = ch + '|||' + po;
+    if (!map[key]) {
+      map[key] = { CHANNEL: ch, 'NO PO': po, Customer: (r['Customer'] || '').trim(),
+        Tanggal_Stuffing_Awal: formatDate(r['Tanggal Stuffing Awal']),
+        Revisi_Tanggal_Stuffing: formatDate(r['Revisi tanggal stuffing']),
+        Revisi_ts: parseSheetDate(r['Revisi tanggal stuffing']),
+        Total_Qty_PO_Dus: 0, Total_Qty_Delv_Dus: 0,
+        Stage: '', Pareto_Problem: '', Status_Order: '', reasons: new Set() };
+    }
+    const e = map[key];
+    e.Total_Qty_PO_Dus += parseFloat(r['Qty PO (Dus)']) || 0;
+    e.Total_Qty_Delv_Dus += parseFloat(r['Qty Delv. (Dus)']) || 0;
+    if (r['Stages'] && r['Stages'].trim()) e.Stage = r['Stages'].trim();
+    if (r['Pareto Problem'] && r['Pareto Problem'].trim()) e.Pareto_Problem = r['Pareto Problem'].trim();
+    if (r['Status Order'] && r['Status Order'].trim()) e.Status_Order = r['Status Order'].trim();
+    const rsn = (r['Reason'] || '').trim();
+    if (rsn && rsn !== '-') e.reasons.add(rsn);
+  });
+  return Object.values(map).map(e => ({ ...e, Reason: [...e.reasons].join(' | ') }));
+}
+
+async function loadData() {
+  document.getElementById('db-meta').textContent = 'Memuat data...';
+  document.getElementById('tbl-body').innerHTML = '<tr><td colspan="11" class="state">Memuat data dari Google Sheets...</td></tr>';
+  try {
+    const res = await fetch(API_URL);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    if (!Array.isArray(json)) throw new Error(json.error || 'Format data tidak valid dari Apps Script');
+    ALL = groupByPO(json);
+    const now = new Date();
+    const channels = [...new Set(ALL.map(r => r.CHANNEL))];
+    document.getElementById('db-meta').textContent = ALL.length + ' PO dari ' + channels.length + ' channel  •  Diperbarui ' + now.toLocaleTimeString('id-ID');
+    buildChBtns();
+    buildStageFilter();
+    applyFilters();
+  } catch(e) {
+    document.getElementById('db-meta').textContent = 'Gagal memuat data: ' + e.message;
+    document.getElementById('db-meta').style.color = '#c62828';
+    document.getElementById('tbl-body').innerHTML = '<tr><td colspan="11" class="state err">Gagal memuat data.<br><br><b>Error:</b> ' + e.message + '<br><br>Cek: (1) Apps Script sudah deploy sebagai Web App, (2) Who has access = Anyone, (3) Sheet name benar.</td></tr>';
+  }
+}
+
+function buildChBtns() {
+  const d = document.getElementById('ch-btns');
+  const chs = [...new Set(ALL.map(r => r.CHANNEL))].sort();
+  let html = '<button class="ch-btn active" style="background:#1a1a2e;color:#fff;border-color:#1a1a2e" onclick="filterCh(\'\',this)">Semua</button>';
+  chs.forEach(ch => {
+    const c = CH_COL[ch] || '#888';
+    html += '<button class="ch-btn" style="border-color:' + c + ';color:' + c + '" onclick="filterCh(\'' + ch + '\',this)">' + ch + '</button>';
+  });
+  d.innerHTML = html;
+}
+
+const STAGE_ORDER = ['0. DRAFT INQUIRY','1. SM','2. PROSES','4. PARTIAL','4. READY DEPO','5. CANCEL','5. CLOSED WITH OUTSTANDING','5. FINISHED','5. READY DEPO','6. FINISHED'];
+let selectedStages = new Set();
+
+function buildStageFilter() {
+  const stages = [...new Set(ALL.map(r => r.Stage).filter(Boolean))].sort((a,b) => {
+    const ai = STAGE_ORDER.indexOf(a), bi = STAGE_ORDER.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1; if (bi === -1) return -1;
+    return ai - bi;
+  });
+  const container = document.getElementById('stage-dd-items');
+  container.innerHTML = stages.map(st => {
+    const color = ({
+      '5. FINISHED':'#2e7d32','6. FINISHED':'#1b5e20','5. CANCEL':'#c62828',
+      '5. CLOSED WITH OUTSTANDING':'#795548','4. READY DEPO':'#6a1b9a','5. READY DEPO':'#8e24aa',
+      '4. PARTIAL':'#e65100','2. PROSES':'#1565c0','1. SM':'#c2185b',
+      '0. DRAFT INQUIRY':'#757575','PENDING':'#f9a825'
+    })[st] || '#888';
+    const safeId = 'stg_' + st.replace(/[^a-zA-Z0-9]/g,'_');
+    return '<label class="stage-lbl" style="display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:12px;color:#333"><input type="checkbox" id="'+safeId+'" value="'+st+'" onchange="stageCheckChange()" style="accent-color:'+color+';width:14px;height:14px;cursor:pointer"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:'+color+';flex-shrink:0"></span>'+st+'</label>';
+  }).join('');
+}
+
+function toggleStageDD() {
+  const m = document.getElementById('stage-dd-menu');
+  m.style.display = m.style.display === 'none' ? 'block' : 'none';
+}
+
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('stage-dd-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    const m = document.getElementById('stage-dd-menu');
+    if (m) m.style.display = 'none';
+  }
+});
+
+function stageCheckChange() {
+  selectedStages = new Set([...document.querySelectorAll('#stage-dd-items input:checked')].map(cb => cb.value));
+  updateStageBtnLabel();
+  applyFilters();
+}
+
+function updateStageBtnLabel() {
+  const lbl = document.getElementById('stage-dd-label');
+  if (selectedStages.size === 0) lbl.textContent = 'Semua Stage';
+  else if (selectedStages.size === 1) lbl.textContent = [...selectedStages][0];
+  else lbl.textContent = selectedStages.size + ' stage dipilih';
+}
+
+function selectAllStages() {
+  document.querySelectorAll('#stage-dd-items input').forEach(cb => { cb.checked = true; });
+  stageCheckChange();
+}
+
+function clearAllStages() {
+  document.querySelectorAll('#stage-dd-items input').forEach(cb => { cb.checked = false; });
+  stageCheckChange();
+}
+
+function filterCh(ch, el) {
+  curCh = ch;
+  document.querySelectorAll('.ch-btn').forEach(b => {
+    b.classList.remove('active');
+    b.style.background = '#fff';
+    b.style.color = b._origColor || b.style.borderColor;
+  });
+  el.classList.add('active');
+  if (ch === '') { el.style.background = '#1a1a2e'; el.style.color = '#fff'; }
+  else { el.style.background = CH_COL[ch] || '#888'; el.style.color = '#fff'; }
+  applyFilters();
+}
+
+function applyFilters() {
+  const q = (document.getElementById('search').value || '').toLowerCase();
+  const pareto = document.getElementById('pareto-sel').value;
+  const order = document.getElementById('order-sel').value;
+  filtered = ALL.filter(r => {
+    if (curCh && r.CHANNEL !== curCh) return false;
+    if (selectedStages.size > 0 && !selectedStages.has(r.Stage)) return false;
+    if (pareto && r.Pareto_Problem !== pareto) return false;
+    if (order && r.Status_Order !== order) return false;
+    if (q && !r['NO PO'].toLowerCase().includes(q) && !r.Customer.toLowerCase().includes(q)) return false;
+    const df = document.getElementById('date-from').value;
+    const dt = document.getElementById('date-to').value;
+    if (df || dt) {
+      const rts = r.Revisi_ts;
+      if (!rts) return false;
+      if (df && rts < new Date(df)) return false;
+      if (dt) { const toD = new Date(dt); toD.setHours(23,59,59); if (rts > toD) return false; }
+    }
+    return true;
+  });
+  curPage = 1;
+  renderSummary();
+  renderCharts();
+  renderTable();
+}
+
+function renderSummary() {
+  const total = filtered.length;
+  const totalQty = Math.round(filtered.reduce((s, r) => s + (r.Total_Qty_PO_Dus || 0), 0));
+  const ontrack = filtered.filter(r => r.Pareto_Problem === 'ON TRACK').length;
+  const delay   = filtered.filter(r => r.Pareto_Problem === 'DELAY').length;
+  const ongoing = filtered.filter(r => !['5. FINISHED','6. FINISHED','5. CANCEL','5. CLOSED WITH OUTSTANDING'].includes(r.Stage)).length;
+  const done    = filtered.filter(r => ['5. FINISHED','6. FINISHED'].includes(r.Stage)).length;
+  document.getElementById('s-total').textContent = total;
+  document.getElementById('s-ongoing').textContent = ongoing;
+  document.getElementById('s-done').textContent = done;
+  document.getElementById('s-ontrack').textContent = ontrack;
+  document.getElementById('s-delay').textContent = delay;
+  document.getElementById('s-qty').textContent = totalQty.toLocaleString();
+  document.getElementById('tbl-title').textContent = (curCh || 'Semua Channel') + ' — ' + total + ' PO';
+}
+
+function renderCharts() {
+  renderChChart();
+  renderStChart();
+  renderParetoChart();
+}
+
+function renderParetoChart() {
+  const el = document.getElementById('chartPareto');
+  if (!el) return;
+  const data = curCh ? filtered : ALL;
+  const chs = [...new Set(data.map(r => r.CHANNEL))].sort();
+  const ontrack = chs.map(ch => data.filter(r => r.CHANNEL === ch && r.Pareto_Problem === 'ON TRACK').length);
+  const delay   = chs.map(ch => data.filter(r => r.CHANNEL === ch && r.Pareto_Problem === 'DELAY').length);
+  const nodata  = chs.map(ch => data.filter(r => r.CHANNEL === ch && r.Pareto_Problem !== 'ON TRACK' && r.Pareto_Problem !== 'DELAY').length);
+  const totals  = chs.map((_, i) => ontrack[i] + delay[i] + nodata[i]);
+
+  if (chartPareto) chartPareto.destroy();
+  chartPareto = new Chart(el, {
+    type: 'bar',
+    data: {
+      labels: chs,
+      datasets: [
+        { label: 'On track', data: ontrack, backgroundColor: '#2e7d32', borderRadius: 0, stack: 'a' },
+        { label: 'Delay',    data: delay,   backgroundColor: '#c62828', borderRadius: 0, stack: 'a' },
+        { label: 'Belum terklasifikasi', data: nodata, backgroundColor: '#d0d0d0', borderRadius: 0, stack: 'a' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            afterBody: function(items) {
+              const idx = items[0].dataIndex;
+              const tot = totals[idx];
+              return items.map(it => {
+                const pct = tot > 0 ? Math.round(it.raw / tot * 100) : 0;
+                return it.dataset.label + ': ' + it.raw + ' PO (' + pct + '%)';
+              });
+            },
+            label: () => null
+          }
+        }
+      },
+      scales: {
+        x: { stacked: true, ticks: { autoSkip: false, color: '#888', font: { size: 11 } }, grid: { display: false } },
+        y: { stacked: true, ticks: { color: '#888', font: { size: 11 }, precision: 0 }, grid: { color: 'rgba(0,0,0,.05)' } }
+      }
+    }
+  });
+
+  // Render percentage labels inside bars per channel
+  const pctWrap = document.getElementById('leg-pareto');
+  const summary = chs.map((ch, i) => {
+    const tot = totals[i];
+    if (tot === 0) return '';
+    const otPct = Math.round(ontrack[i] / tot * 100);
+    const dlPct = Math.round(delay[i] / tot * 100);
+    return '<span style="font-size:11px;color:#555;background:#f7f8fa;border-radius:5px;padding:2px 8px;border:1px solid #e8ebf0">'
+      + '<b style="color:' + (CH_COL[ch]||'#888') + '">' + ch + '</b>'
+      + ' &nbsp;&#10003; ' + otPct + '%'
+      + (delay[i] > 0 ? ' &nbsp;&#9888; ' + dlPct + '%' : '')
+      + '</span>';
+  }).join('');
+  pctWrap.innerHTML = '<span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555"><span style="width:9px;height:9px;border-radius:2px;background:#2e7d32;display:inline-block"></span>On track</span>'
+    + '<span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555"><span style="width:9px;height:9px;border-radius:2px;background:#c62828;display:inline-block"></span>Delay</span>'
+    + '<span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555"><span style="width:9px;height:9px;border-radius:2px;background:#d0d0d0;display:inline-block"></span>Belum terklasifikasi</span>'
+    + (summary ? '<span style="margin-left:8px;display:flex;flex-wrap:wrap;gap:5px">' + summary + '</span>' : '');
+}
+
+function renderChChart() {
+  const data = ALL;
+  const chs = [...new Set(data.map(r => r.CHANNEL))].sort();
+  const counts = chs.map(ch => filtered.filter(r => r.CHANNEL === ch).length);
+  const totalAll = chs.map(ch => data.filter(r => r.CHANNEL === ch).length);
+  const colors = chs.map(ch => CH_COL[ch] || '#888');
+  document.getElementById('leg-ch').innerHTML = chs.map((ch, i) =>
+    '<span class="legend-item"><span class="legend-dot" style="background:' + colors[i] + '"></span>' + ch + ' ' + counts[i] + '</span>'
+  ).join('');
+  if (chartCh) chartCh.destroy();
+  chartCh = new Chart(document.getElementById('chartCh'), {
+    type: 'bar',
+    data: { labels: chs, datasets: [{ data: counts, backgroundColor: colors, borderRadius: 5, borderSkipped: false }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + ctx.raw + ' PO' } } },
+      scales: {
+        x: { ticks: { autoSkip: false, color: '#888', font: { size: 11 } }, grid: { display: false } },
+        y: { ticks: { color: '#888', font: { size: 11 }, precision: 0 }, grid: { color: 'rgba(0,0,0,.05)' } }
+      }
+    }
+  });
+}
+
+function renderStChart() {
+  const stageCounts = {};
+  filtered.forEach(r => { const s = r.Stage || 'Lainnya'; stageCounts[s] = (stageCounts[s] || 0) + 1; });
+  const stages = Object.keys(stageCounts).sort();
+  const counts = stages.map(s => stageCounts[s]);
+  const colors = stages.map(s => STAGE_COL[s] || '#9e9e9e');
+  const total = counts.reduce((a, b) => a + b, 0);
+  document.getElementById('leg-st').innerHTML = stages.map((s, i) =>
+    '<span class="legend-item"><span class="legend-dot" style="background:' + colors[i] + '"></span>' + s + ' (' + counts[i] + ')</span>'
+  ).join('');
+  if (chartSt) chartSt.destroy();
+  chartSt = new Chart(document.getElementById('chartSt'), {
+    type: 'doughnut',
+    data: { labels: stages, datasets: [{ data: counts, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '62%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ' ' + ctx.label + ': ' + ctx.raw + ' (' + Math.round(ctx.raw / total * 100) + '%)' } }
+      }
+    }
+  });
+}
+
+function badge(s) { const c = STAGE_BADGE[s] || 'bdr'; return '<span class="badge ' + c + '">' + (s || '-') + '</span>'; }
+function paretoBadge(p) {
+  if (p === 'DELAY') return '<span class="badge bdelay">DELAY</span>';
+  if (p === 'ON TRACK') return '<span class="badge bontrack">ON TRACK</span>';
+  return '<span style="color:#ccc;font-size:11px">-</span>';
+}
+function orderBadge(o) {
+  if (o === 'Done') return '<span class="badge bdone">Done</span>';
+  if (o === 'Progress') return '<span class="badge bprog">Progress</span>';
+  if (o === 'Waiting') return '<span class="badge bwait">Waiting</span>';
+  return '<span style="color:#ccc;font-size:11px">-</span>';
+}
+function shortR(r) {
+  if (!r || r === '-') return '<span style="color:#ccc;font-size:11px">-</span>';
+  const s = r.split(' | ')[0];
+  return '<span style="font-size:11px;color:#666">' + s.substring(0, 48) + (s.length > 48 ? '...' : '') + '</span>';
+}
+
+function renderTable() {
+  const tbody = document.getElementById('tbl-body');
+  const start = (curPage - 1) * perPage;
+  const page = filtered.slice(start, start + perPage);
+  if (!page.length) { tbody.innerHTML = '<tr><td colspan="11" class="state">Tidak ada data yang sesuai filter</td></tr>'; renderPag(); return; }
+  tbody.innerHTML = page.map((r, i) => {
+    const c = CH_COL[r.CHANNEL] || '#888';
+    return '<tr onclick="openMod(' + (start + i) + ')">' +
+      '<td style="font-weight:600;color:#1a1a2e">' + r['NO PO'] + '</td>' +
+      '<td><span style="font-size:10px;font-weight:700;color:' + c + ';background:' + c + '18;padding:2px 7px;border-radius:3px">' + r.CHANNEL + '</span></td>' +
+      '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#555">' + r.Customer + '</td>' +
+      '<td style="color:#888;white-space:nowrap;font-size:11px">' + r.Tanggal_Stuffing_Awal + '</td>' +
+      '<td style="color:#888;white-space:nowrap;font-size:11px">' + r.Revisi_Tanggal_Stuffing + '</td>' +
+      '<td style="text-align:right;font-weight:500">' + Math.round(r.Total_Qty_PO_Dus).toLocaleString() + '</td>' +
+      '<td style="text-align:right;font-weight:500">' + Math.round(r.Total_Qty_Delv_Dus).toLocaleString() + '</td>' +
+      '<td>' + badge(r.Stage) + '</td>' +
+      '<td>' + paretoBadge(r.Pareto_Problem) + '</td>' +
+      '<td>' + orderBadge(r.Status_Order) + '</td>' +
+      '<td>' + shortR(r.Reason) + '</td>' +
+    '</tr>';
+  }).join('');
+  renderPag();
+}
+
+function renderPag() {
+  const p = document.getElementById('pag');
+  const total = Math.ceil(filtered.length / perPage);
+  if (total <= 1) { p.innerHTML = '<span>' + filtered.length + ' record</span><span></span>'; return; }
+  let btns = '<div class="pag-btns">';
+  btns += '<button class="pb" onclick="goPage(' + (curPage-1) + ')" ' + (curPage===1?'disabled':'') + '>&#8249;</button>';
+  for (let i = Math.max(1, curPage-2); i <= Math.min(total, curPage+2); i++)
+    btns += '<button class="pb' + (i===curPage?' cur':'') + '" onclick="goPage(' + i + ')">' + i + '</button>';
+  btns += '<button class="pb" onclick="goPage(' + (curPage+1) + ')" ' + (curPage===total?'disabled':'') + '>&#8250;</button></div>';
+  p.innerHTML = '<span>Hal. ' + curPage + ' / ' + total + ' &bull; ' + filtered.length + ' record</span>' + btns;
+}
+
+function goPage(n) { const t = Math.ceil(filtered.length/perPage); if(n<1||n>t) return; curPage=n; renderTable(); window.scrollTo(0,0); }
+
+function openMod(idx) {
+  const r = filtered[idx];
+  document.getElementById('m-po').textContent = r['NO PO'];
+  const c = CH_COL[r.CHANNEL] || '#888';
+  document.getElementById('m-ch').innerHTML = '<span style="color:' + c + ';font-weight:600">' + r.CHANNEL + '</span> &nbsp;&bull;&nbsp; ' + r.Customer;
+  const rsns = r.Reason && r.Reason !== '-' ? r.Reason.split(' | ').filter(x => x.trim()) : [];
+  const fulfil = r.Total_Qty_PO_Dus > 0 ? Math.round(r.Total_Qty_Delv_Dus / r.Total_Qty_PO_Dus * 100) + '%' : '-';
+  document.getElementById('m-body').innerHTML =
+    '<div class="info-g">' +
+      ii('Stuffing Awal', r.Tanggal_Stuffing_Awal || '-') +
+      ii('Revisi Stuffing', r.Revisi_Tanggal_Stuffing || '-') +
+      ii('Qty PO (Dus)', Math.round(r.Total_Qty_PO_Dus).toLocaleString()) +
+      ii('Qty Deliv (Dus)', Math.round(r.Total_Qty_Delv_Dus).toLocaleString()) +
+      ii('Fulfillment Rate', fulfil) +
+      ii('Stage', r.Stage || '-') +
+      ii('Pareto Problem', r.Pareto_Problem || '-') +
+      ii('Status Order', r.Status_Order || '-') +
+    '</div>' +
+    '<div class="reason-box"><h5>Merged reason (' + rsns.length + ' entri)</h5>' +
+    (rsns.length ? rsns.map(re => '<div class="re">' + re.trim() + '</div>').join('') : '<p class="no-r">Tidak ada reason tercatat</p>') +
+    '</div>';
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function ii(l, v) { return '<div class="ii"><div class="il">' + l + '</div><div class="iv">' + v + '</div></div>'; }
+function closeMod(e) { if(e.target===document.getElementById('modal-overlay')) document.getElementById('modal-overlay').classList.remove('open'); }
+
+document.getElementById('search').addEventListener('input', applyFilters);
+
+document.getElementById('pareto-sel').addEventListener('change', applyFilters);
+document.getElementById('order-sel').addEventListener('change', applyFilters);
+document.getElementById('date-from').addEventListener('change', applyFilters);
+document.getElementById('date-to').addEventListener('change', applyFilters);
+
+function clearDates() {
+  document.getElementById('date-from').value = '';
+  document.getElementById('date-to').value = '';
+  applyFilters();
+}
+
+loadData();
+</script>
+</body>
+</html>
