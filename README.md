@@ -1,161 +1,162 @@
-# 📊 Dashboard Monitoring PO
+# 📊 Dashboard Monitoring PO Khusus
 
-## 📸 Preview
+Dashboard interaktif berbasis HTML + JavaScript untuk monitoring Purchase Order (PO) khusus secara real-time, terintegrasi langsung dengan Google Sheets melalui Apps Script API.
+
+---
+
+## 🖼️ Preview
 
 ![Dashboard Preview](Dashboard_Preview.jpg)
-
-Dashboard berbasis HTML + Google Apps Script untuk monitoring Purchase Order (PO) secara real-time langsung dari Google Spreadsheet.
+(https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExb24wdHVlZ2M5aWcxdnVsNGtjdmhjazhndGY4dHRwZ2JmNGg5M3QzdiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/nBEup7jCb7ZQw1jmP3/giphy.gif)
 
 ---
 
 ## 🚀 Features
 
-* 📡 **Live Data** dari Google Sheets (via Apps Script API)
-* 📊 **Visualisasi Chart**
+### 📈 Summary Metrics
 
-  * PO per Sales Channel
-  * PO per Stage
-  * On Track vs Delay (Pareto)
-* 🔍 **Filtering Interaktif**
+* Total PO
+* On-going vs Finished
+* On Track vs Delay
+* Total Quantity (Dus)
 
-  * Channel
-  * Stage (multi-select)
-  * Status (On Track / Delay)
+---
+
+### 📊 Visual Analytics
+
+* **PO per Sales Channel** (Bar Chart)
+* **PO per Stage** (Doughnut Chart)
+* **On Track vs Delay per Channel** (Stacked Bar)
+* **Alokasi SKU per Plant** (Bar Chart)
+
+---
+
+### 🔍 Advanced Filtering
+
+* Filter by:
+
+  * Sales Channel
+  * Stage (multi-select dropdown)
+  * Pareto Status (ON TRACK / DELAY)
   * Order Status (Done / Progress / Waiting)
-  * Range tanggal revisi stuffing
-* 🔎 **Search PO / Customer**
-* 📋 **Table Detail + Pagination**
-* 📦 **Modal Detail PO**
+  * Date Range (Revisi Stuffing)
+* Search by:
+
+  * No PO
+  * Customer
+
+---
+
+### 📋 Table & Detail View
+
+* Paginated PO table
+* Click row → open modal detail:
 
   * Qty PO vs Delivery
   * Fulfillment Rate
-  * Aggregated Reason
+  * SKU breakdown
+  * Plant allocation
+  * Reason aggregation
 
 ---
 
-## 🧠 Arsitektur
+## 🧠 Data Processing Logic
 
-Frontend:
+### Grouping Strategy
 
-* HTML, CSS, Vanilla JavaScript
-* Chart.js untuk visualisasi
+Data dari Google Sheets di-aggregate per:
 
-Backend:
-
-* Google Apps Script (Web App)
-* Data source dari Google Spreadsheet
-
-```text
-Google Sheets → Apps Script (API /exec) → HTML Dashboard
+```
+CHANNEL + NO PO
 ```
 
+### Aggregated Fields
+
+* Total Qty PO (Dus)
+* Total Qty Delivery (Dus)
+* Stage & Status
+* Merged Reason (unique)
+* SKU-level detail
+* Plant allocation per PO
+
 ---
 
-## 🔗 API Endpoint
+## ⚙️ Tech Stack
 
-```text
+* Vanilla JavaScript (no framework)
+* Chart.js (visualization)
+* Google Apps Script (API layer)
+* Google Sheets (data source)
+
+---
+
+## 🔌 Data Source
+
+Endpoint:
+
+```
 https://script.google.com/macros/s/AKfycbyo5y8mS6FJC8UY5UHnW_uD4QnjqceRhjUgbctUz7N4srKb6-L_BkmHe6hhIMWzfKj3eA/exec
 ```
 
-Pastikan:
+### Requirement:
 
-* Deployment = Web App
-* Access = Anyone
-
----
-
-## 📂 Struktur Data (Expected)
-
-Field yang digunakan:
-
-| Field                   | Description               |
-| ----------------------- | ------------------------- |
-| NO PO                   | Nomor PO                  |
-| CHANNEL                 | Sales channel             |
-| Customer                | Nama customer             |
-| Tanggal Stuffing Awal   | Tanggal awal              |
-| Revisi tanggal stuffing | Tanggal revisi            |
-| Qty PO (Dus)            | Quantity PO               |
-| Qty Delv. (Dus)         | Quantity delivery         |
-| Stages                  | Status proses             |
-| Pareto Problem          | ON TRACK / DELAY          |
-| Status Order            | Done / Progress / Waiting |
-| Reason                  | Alasan delay / note       |
+* Apps Script sudah deploy sebagai Web App
+* Access: **Anyone**
+* Return format: JSON array
 
 ---
 
-## 🛠 Cara Menjalankan
+## 📁 File Structure
 
-### 1. Lokal (Testing)
-
-```bash
+```
 index.html
 ```
 
-atau double click file HTML.
+Single file berisi:
+
+* HTML (structure)
+* CSS (styling)
+* JavaScript (logic, data processing, chart)
 
 ---
 
-### 2. Deploy jadi Web App
+## ⚡ Performance Notes
 
-#### Opsi 1 — GitHub Pages
-
-1. Upload ke repository
-2. Enable GitHub Pages
-3. Akses via:
-
-```text
-https://username.github.io/repo-name/
-```
-
-#### Opsi 2 — Apps Script HTML Service
-
-* Embed HTML ke Apps Script
-* Deploy via `doGet()`
-
-#### Opsi 3 — Vercel / Netlify
-
-* Drag & drop project
-* Auto deploy
+* Chart menggunakan `update()` (tidak recreate)
+* Data aggregation dilakukan sekali saat load
+* Filtering berbasis in-memory (cepat)
+* Pagination untuk handle dataset besar
 
 ---
 
-## ⚠️ Troubleshooting
+## 🧪 Known Limitations
 
-### ❌ Data tidak muncul
-
-* Cek API bisa diakses langsung di browser
-* Pastikan return JSON valid
-
-### ❌ Error fetch / CORS
-
-* Pastikan Apps Script deploy sebagai Web App
-* Access: Anyone
-
-### ❌ Data kosong
-
-* Cek struktur field di Spreadsheet
-* Pastikan nama kolom sesuai
+* Belum ada debounce pada search
+* Semua data di-load di awal (belum server-side)
+* Tidak ada caching API
 
 ---
 
-## 📈 Future Improvement
+## 💡 Future Improvement
 
-* 🔐 Authentication / Login
-* 📤 Export Excel / CSV
-* 🔔 Alert untuk PO Delay
-* 📊 KPI tambahan (Lead Time, SLA)
-* 📱 Responsive optimization (mobile)
+* Debounce search input
+* Cache API response
+* Virtual scrolling
+* Export ke Excel
+* Integrasi ke ERP (Odoo API)
 
 ---
 
 ## 👨‍💻 Author
-Wahyu Aji L - SCM
 
-Developed for internal SCM / PPIC monitoring.
+Wahyu Aji L - SCM
 
 ---
 
-## 📄 License
+## 🧠 Notes
 
-Internal use only.
+Dashboard ini dibuat untuk kebutuhan operasional PPIC / SCM:
+
+* Monitoring PO real-time
+* Identifikasi delay
+* Visibility workload per plant
