@@ -7,8 +7,7 @@ Dashboard interaktif berbasis HTML + JavaScript untuk monitoring Purchase Order 
 ## 🖼️ Preview
 
 ![Dashboard Preview](Dashboard_Preview.jpg)
-!(https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExb24wdHVlZ2M5aWcxdnVsNGtjdmhjazhndGY4dHRwZ2JmNGg5M3QzdiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/nBEup7jCb7ZQw1jmP3/giphy.gif)
-
+<img src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExb24wdHVlZ2M5aWcxdnVsNGtjdmhjazhndGY4dHRwZ2JmNGg5M3QzdiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/nBEup7jCb7ZQw1jmP3/giphy.gif" width="600"/>
 ---
 
 ## 🚀 Features
