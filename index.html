@@ -149,6 +149,16 @@ td{padding:9px 13px;vertical-align:middle}
     </div>
   </div>
 
+  <div style="margin-bottom:14px">
+    <div class="chart-card">
+      <div class="chart-card-title">Alokasi SKU berjalan per plant</div>
+      <div class="legend-row" id="leg-plant"></div>
+      <div style="position:relative;width:100%;height:220px">
+        <canvas id="chartPlant" role="img" aria-label="Bar chart alokasi SKU per plant">Alokasi per plant.</canvas>
+      </div>
+    </div>
+  </div>
+
   <div class="filters">
     <div class="ch-btns" id="ch-btns"></div>
     <input type="text" id="search" placeholder="Cari NO PO / Customer...">
@@ -224,13 +234,73 @@ td{padding:9px 13px;vertical-align:middle}
 </div>
 
 <script>
+function renderChChart() {
+  const chs    = [...new Set(ALL.map(r => r.CHANNEL))].sort();
+  const colors = chs.map(ch => CH_COL[ch] || '#888');
+  const cnt    = {};
+  chs.forEach(ch => { cnt[ch] = 0; });
+  filtered.forEach(r => { if (cnt[r.CHANNEL] !== undefined) cnt[r.CHANNEL]++; });
+  const counts = chs.map(ch => cnt[ch]);
+  document.getElementById('leg-ch').innerHTML = chs.map((ch, i) =>
+    '<span class="legend-item"><span class="legend-dot" style="background:' + colors[i] + '"></span>' + ch + ' ' + counts[i] + '</span>'
+  ).join('');
+  if (chartCh) {
+    chartCh.data.datasets[0].data = counts;
+    chartCh.update('none');
+    return;
+  }
+  chartCh = new Chart(document.getElementById('chartCh'), {
+    type: 'bar',
+    data: { labels: chs, datasets: [{ data: counts, backgroundColor: colors, borderRadius: 5, borderSkipped: false }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + ctx.raw + ' PO' } } },
+      scales: {
+        x: { ticks: { autoSkip: false, color: '#888', font: { size: 11 } }, grid: { display: false } },
+        y: { ticks: { color: '#888', font: { size: 11 }, precision: 0 }, grid: { color: 'rgba(0,0,0,.05)' } }
+      }
+    }
+  });
+}
+
+function renderStChart() {
+  const stageCounts = {};
+  filtered.forEach(r => { const s = r.Stage || 'Lainnya'; stageCounts[s] = (stageCounts[s] || 0) + 1; });
+  const stages = Object.keys(stageCounts).sort();
+  const counts = stages.map(s => stageCounts[s]);
+  const colors = stages.map(s => STAGE_COL[s] || '#9e9e9e');
+  const total  = counts.reduce((a, b) => a + b, 0);
+  document.getElementById('leg-st').innerHTML = stages.map((s, i) =>
+    '<span class="legend-item"><span class="legend-dot" style="background:' + colors[i] + '"></span>' + s + ' (' + counts[i] + ')</span>'
+  ).join('');
+  if (chartSt) {
+    chartSt.data.labels = stages;
+    chartSt.data.datasets[0].data = counts;
+    chartSt.data.datasets[0].backgroundColor = colors;
+    chartSt.options.plugins.tooltip.callbacks.label = ctx => ' ' + ctx.label + ': ' + ctx.raw + ' (' + Math.round(ctx.raw / total * 100) + '%)';
+    chartSt.update('none');
+    return;
+  }
+  chartSt = new Chart(document.getElementById('chartSt'), {
+    type: 'doughnut',
+    data: { labels: stages, datasets: [{ data: counts, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '62%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ' ' + ctx.label + ': ' + ctx.raw + ' (' + Math.round(ctx.raw / total * 100) + '%)' } }
+      }
+    }
+  });
+}
+
 const API_URL = 'https://script.google.com/macros/s/AKfycbyo5y8mS6FJC8UY5UHnW_uD4QnjqceRhjUgbctUz7N4srKb6-L_BkmHe6hhIMWzfKj3eA/exec';
 
 const CH_COL = {MT:'#1565c0',IBD:'#6a1b9a',GT:'#2e7d32',CORTEZ:'#c62828',OSS:'#e65100','PORTO X':'#4e342e'};
 const STAGE_COL = {'5. FINISHED':'#2e7d32','6. FINISHED':'#1b5e20','5. CANCEL':'#c62828','5. CLOSED WITH OUTSTANDING':'#795548','4. READY DEPO':'#6a1b9a','5. READY DEPO':'#8e24aa','4. PARTIAL':'#e65100','2. PROSES':'#1565c0','1. SM':'#c2185b','0. DRAFT INQUIRY':'#757575','PENDING':'#f9a825'};
 const STAGE_BADGE = {'5. FINISHED':'bf','6. FINISHED':'bf','5. CANCEL':'bc','5. CLOSED WITH OUTSTANDING':'bcl','4. READY DEPO':'bd','5. READY DEPO':'bd','4. PARTIAL':'bpa','2. PROSES':'bp','1. SM':'bs','0. DRAFT INQUIRY':'bdr','PENDING':'bw'};
 
-let ALL = [], filtered = [], curCh = '', curPage = 1, perPage = 30, chartCh = null, chartSt = null, chartPareto = null;
+let ALL = [], filtered = [], curCh = '', curPage = 1, perPage = 30, chartCh = null, chartSt = null, chartPareto = null, chartPlant = null;
 
 function parseSheetDate(val) {
   if (val === null || val === undefined || val === '') return null;
@@ -264,32 +334,47 @@ function formatDate(val) {
 
 function groupByPO(rows) {
   const map = {};
-  rows.forEach(r => {
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
     const ch = (r['CHANNEL'] || '').trim();
     const po = (r['NO PO'] || '').trim();
-    if (!ch || !po) return;
+    if (!ch || !po) continue;
     const key = ch + '|||' + po;
-    if (!map[key]) {
-      map[key] = { CHANNEL: ch, 'NO PO': po, Customer: (r['Customer'] || '').trim(),
+    let e = map[key];
+    if (!e) {
+      e = map[key] = {
+        CHANNEL: ch, 'NO PO': po,
+        Customer: (r['Customer'] || '').trim(),
         Tanggal_Stuffing_Awal: formatDate(r['Tanggal Stuffing Awal']),
         Revisi_Tanggal_Stuffing: formatDate(r['Revisi tanggal stuffing']),
         Revisi_ts: parseSheetDate(r['Revisi tanggal stuffing']),
         Total_Qty_PO_Dus: 0, Total_Qty_Delv_Dus: 0,
-        Stage: '', Pareto_Problem: '', Status_Order: '', reasons: new Set(), skuRows: [] };
+        Stage: '', Pareto_Problem: '', Status_Order: '',
+        _reasons: new Set(), skuRows: []
+      };
     }
-    const e = map[key];
-    e.Total_Qty_PO_Dus += parseFloat(r['Qty PO (Dus)']) || 0;
+    const qty = parseFloat(r['Qty PO (Dus)']) || 0;
+    e.Total_Qty_PO_Dus  += qty;
     e.Total_Qty_Delv_Dus += parseFloat(r['Qty Delv. (Dus)']) || 0;
-    if (r['Stages'] && r['Stages'].trim()) e.Stage = r['Stages'].trim();
-    if (r['Pareto Problem'] && r['Pareto Problem'].trim()) e.Pareto_Problem = r['Pareto Problem'].trim();
-    if (r['Status Order'] && r['Status Order'].trim()) e.Status_Order = r['Status Order'].trim();
+    const st = r['Stages'];         if (st && st.trim()) e.Stage = st.trim();
+    const pp = r['Pareto Problem']; if (pp && pp.trim()) e.Pareto_Problem = pp.trim();
+    const so = r['Status Order'];   if (so && so.trim()) e.Status_Order = so.trim();
     const rsn = (r['Reason'] || '').trim();
-    if (rsn && rsn !== '-') e.reasons.add(rsn);
-    const sku = (r['SKU'] || '').trim();
-    const skuQty = parseFloat(r['Qty PO (Dus)']) || 0;
-    if (sku) e.skuRows.push({ sku: sku, qty: skuQty, reason: (rsn && rsn !== '-') ? rsn : '' });
-  });
-  return Object.values(map).map(e => ({ ...e, Reason: [...e.reasons].join(' | '), skuRows: e.skuRows }));
+    if (rsn && rsn !== '-') e._reasons.add(rsn);
+    const sku   = (r['SKU']   || '').trim();
+    const plant = (r['Plant'] || '').trim();
+    if (sku) e.skuRows.push({ sku, qty, plant, reason: rsn && rsn !== '-' ? rsn : '' });
+    if (plant) { e._plants = e._plants || {}; e._plants[plant] = (e._plants[plant] || 0) + 1; }
+  }
+  const result = Object.values(map);
+  for (let i = 0; i < result.length; i++) {
+    const e = result[i];
+    e.Reason = [...e._reasons].join(' | ');
+    delete e._reasons;
+    e.plants = e._plants || {};
+    delete e._plants;
+  }
+  return result;
 }
 
 async function loadData() {
@@ -398,22 +483,27 @@ function filterCh(ch, el) {
 }
 
 function applyFilters() {
-  const q = (document.getElementById('search').value || '').toLowerCase();
+  const q      = (document.getElementById('search').value || '').toLowerCase();
   const pareto = document.getElementById('pareto-sel').value;
-  const order = document.getElementById('order-sel').value;
+  const order  = document.getElementById('order-sel').value;
+  const dfStr  = document.getElementById('date-from').value;
+  const dtStr  = document.getElementById('date-to').value;
+  const dfDate = dfStr ? new Date(dfStr) : null;
+  const dtDate = dtStr ? (() => { const d = new Date(dtStr); d.setHours(23,59,59,999); return d; })() : null;
+  const hasDate  = !!(dfDate || dtDate);
+  const hasStage = selectedStages.size > 0;
+
   filtered = ALL.filter(r => {
-    if (curCh && r.CHANNEL !== curCh) return false;
-    if (selectedStages.size > 0 && !selectedStages.has(r.Stage)) return false;
-    if (pareto && r.Pareto_Problem !== pareto) return false;
-    if (order && r.Status_Order !== order) return false;
+    if (curCh    && r.CHANNEL        !== curCh)    return false;
+    if (hasStage && !selectedStages.has(r.Stage))  return false;
+    if (pareto   && r.Pareto_Problem !== pareto)    return false;
+    if (order    && r.Status_Order   !== order)     return false;
     if (q && !r['NO PO'].toLowerCase().includes(q) && !r.Customer.toLowerCase().includes(q)) return false;
-    const df = document.getElementById('date-from').value;
-    const dt = document.getElementById('date-to').value;
-    if (df || dt) {
+    if (hasDate) {
       const rts = r.Revisi_ts;
-      if (!rts) return false;
-      if (df && rts < new Date(df)) return false;
-      if (dt) { const toD = new Date(dt); toD.setHours(23,59,59); if (rts > toD) return false; }
+      if (!rts)                   return false;
+      if (dfDate && rts < dfDate) return false;
+      if (dtDate && rts > dtDate) return false;
     }
     return true;
   });
@@ -443,116 +533,114 @@ function renderCharts() {
   renderChChart();
   renderStChart();
   renderParetoChart();
+  renderPlantChart();
 }
 
 function renderParetoChart() {
   const el = document.getElementById('chartPareto');
   if (!el) return;
   const data = curCh ? filtered : ALL;
-  const chs = [...new Set(data.map(r => r.CHANNEL))].sort();
-  const ontrack = chs.map(ch => data.filter(r => r.CHANNEL === ch && r.Pareto_Problem === 'ON TRACK').length);
-  const delay   = chs.map(ch => data.filter(r => r.CHANNEL === ch && r.Pareto_Problem === 'DELAY').length);
-  const nodata  = chs.map(ch => data.filter(r => r.CHANNEL === ch && r.Pareto_Problem !== 'ON TRACK' && r.Pareto_Problem !== 'DELAY').length);
+  const chs  = [...new Set(ALL.map(r => r.CHANNEL))].sort();
+  const agg  = {};
+  chs.forEach(ch => { agg[ch] = { on: 0, dl: 0, nd: 0 }; });
+  data.forEach(r => {
+    const a = agg[r.CHANNEL]; if (!a) return;
+    if      (r.Pareto_Problem === 'ON TRACK') a.on++;
+    else if (r.Pareto_Problem === 'DELAY')    a.dl++;
+    else                                       a.nd++;
+  });
+  const ontrack = chs.map(ch => agg[ch].on);
+  const delay   = chs.map(ch => agg[ch].dl);
+  const nodata  = chs.map(ch => agg[ch].nd);
   const totals  = chs.map((_, i) => ontrack[i] + delay[i] + nodata[i]);
 
-  if (chartPareto) chartPareto.destroy();
-  chartPareto = new Chart(el, {
-    type: 'bar',
-    data: {
-      labels: chs,
-      datasets: [
-        { label: 'On track', data: ontrack, backgroundColor: '#2e7d32', borderRadius: 0, stack: 'a' },
-        { label: 'Delay',    data: delay,   backgroundColor: '#c62828', borderRadius: 0, stack: 'a' },
-        { label: 'Belum terklasifikasi', data: nodata, backgroundColor: '#d0d0d0', borderRadius: 0, stack: 'a' }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            afterBody: function(items) {
-              const idx = items[0].dataIndex;
-              const tot = totals[idx];
-              return items.map(it => {
-                const pct = tot > 0 ? Math.round(it.raw / tot * 100) : 0;
-                return it.dataset.label + ': ' + it.raw + ' PO (' + pct + '%)';
-              });
-            },
-            label: () => null
-          }
-        }
+  if (chartPareto) {
+    chartPareto.data.labels = chs;
+    chartPareto.data.datasets[0].data = ontrack;
+    chartPareto.data.datasets[1].data = delay;
+    chartPareto.data.datasets[2].data = nodata;
+    chartPareto.update('none');
+  } else {
+    chartPareto = new Chart(el, {
+      type: 'bar',
+      data: {
+        labels: chs,
+        datasets: [
+          { label: 'On track', data: ontrack, backgroundColor: '#2e7d32', borderRadius: 0, stack: 'a' },
+          { label: 'Delay',    data: delay,   backgroundColor: '#c62828', borderRadius: 0, stack: 'a' },
+          { label: 'Belum terklasifikasi', data: nodata, backgroundColor: '#d0d0d0', borderRadius: 0, stack: 'a' }
+        ]
       },
-      scales: {
-        x: { stacked: true, ticks: { autoSkip: false, color: '#888', font: { size: 11 } }, grid: { display: false } },
-        y: { stacked: true, ticks: { color: '#888', font: { size: 11 }, precision: 0 }, grid: { color: 'rgba(0,0,0,.05)' } }
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              afterBody: function(items) {
+                const i = items[0].dataIndex, tot = totals[i];
+                return items.map(it => it.dataset.label + ': ' + it.raw + ' PO (' + (tot > 0 ? Math.round(it.raw / tot * 100) : 0) + '%)');
+              },
+              label: () => null
+            }
+          }
+        },
+        scales: {
+          x: { stacked: true, ticks: { autoSkip: false, color: '#888', font: { size: 11 } }, grid: { display: false } },
+          y: { stacked: true, ticks: { color: '#888', font: { size: 11 }, precision: 0 }, grid: { color: 'rgba(0,0,0,.05)' } }
+        }
       }
-    }
-  });
+    });
+  }
 
-  // Render percentage labels inside bars per channel
   const pctWrap = document.getElementById('leg-pareto');
   const summary = chs.map((ch, i) => {
-    const tot = totals[i];
-    if (tot === 0) return '';
+    const tot = totals[i]; if (tot === 0) return '';
     const otPct = Math.round(ontrack[i] / tot * 100);
-    const dlPct = Math.round(delay[i] / tot * 100);
+    const dlPct = Math.round(delay[i]   / tot * 100);
     return '<span style="font-size:11px;color:#555;background:#f7f8fa;border-radius:5px;padding:2px 8px;border:1px solid #e8ebf0">'
-      + '<b style="color:' + (CH_COL[ch]||'#888') + '">' + ch + '</b>'
+      + '<b style="color:' + (CH_COL[ch] || '#888') + '">' + ch + '</b>'
       + ' &nbsp;&#10003; ' + otPct + '%'
       + (delay[i] > 0 ? ' &nbsp;&#9888; ' + dlPct + '%' : '')
       + '</span>';
   }).join('');
-  pctWrap.innerHTML = '<span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555"><span style="width:9px;height:9px;border-radius:2px;background:#2e7d32;display:inline-block"></span>On track</span>'
+  pctWrap.innerHTML =
+    '<span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555"><span style="width:9px;height:9px;border-radius:2px;background:#2e7d32;display:inline-block"></span>On track</span>'
     + '<span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555"><span style="width:9px;height:9px;border-radius:2px;background:#c62828;display:inline-block"></span>Delay</span>'
     + '<span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555"><span style="width:9px;height:9px;border-radius:2px;background:#d0d0d0;display:inline-block"></span>Belum terklasifikasi</span>'
     + (summary ? '<span style="margin-left:8px;display:flex;flex-wrap:wrap;gap:5px">' + summary + '</span>' : '');
 }
 
-function renderChChart() {
-  const data = ALL;
-  const chs = [...new Set(data.map(r => r.CHANNEL))].sort();
-  const counts = chs.map(ch => filtered.filter(r => r.CHANNEL === ch).length);
-  const totalAll = chs.map(ch => data.filter(r => r.CHANNEL === ch).length);
-  const colors = chs.map(ch => CH_COL[ch] || '#888');
-  document.getElementById('leg-ch').innerHTML = chs.map((ch, i) =>
-    '<span class="legend-item"><span class="legend-dot" style="background:' + colors[i] + '"></span>' + ch + ' ' + counts[i] + '</span>'
+function renderPlantChart() {
+  const el = document.getElementById('chartPlant');
+  if (!el) return;
+  const plantCnt = {};
+  filtered.forEach(r => {
+    r.skuRows.forEach(s => { if (s.plant) plantCnt[s.plant] = (plantCnt[s.plant] || 0) + 1; });
+  });
+  const plants = Object.keys(plantCnt).sort();
+  const counts = plants.map(p => plantCnt[p]);
+  const PCOLS  = ['#1565c0','#6a1b9a','#2e7d32','#c62828','#e65100','#4e342e','#00838f','#558b2f'];
+  const colors = plants.map((_, i) => PCOLS[i % PCOLS.length]);
+  document.getElementById('leg-plant').innerHTML = plants.map((p, i) =>
+    '<span class="legend-item"><span class="legend-dot" style="background:' + colors[i] + '"></span>' + p + ' (' + counts[i] + ')</span>'
   ).join('');
-  if (chartCh) chartCh.destroy();
-  chartCh = new Chart(document.getElementById('chartCh'), {
+  if (chartPlant) {
+    chartPlant.data.labels = plants;
+    chartPlant.data.datasets[0].data = counts;
+    chartPlant.data.datasets[0].backgroundColor = colors;
+    chartPlant.update('none');
+    return;
+  }
+  chartPlant = new Chart(el, {
     type: 'bar',
-    data: { labels: chs, datasets: [{ data: counts, backgroundColor: colors, borderRadius: 5, borderSkipped: false }] },
+    data: { labels: plants, datasets: [{ data: counts, backgroundColor: colors, borderRadius: 5, borderSkipped: false }] },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + ctx.raw + ' PO' } } },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + ctx.raw + ' SKU berjalan' } } },
       scales: {
         x: { ticks: { autoSkip: false, color: '#888', font: { size: 11 } }, grid: { display: false } },
         y: { ticks: { color: '#888', font: { size: 11 }, precision: 0 }, grid: { color: 'rgba(0,0,0,.05)' } }
-      }
-    }
-  });
-}
-
-function renderStChart() {
-  const stageCounts = {};
-  filtered.forEach(r => { const s = r.Stage || 'Lainnya'; stageCounts[s] = (stageCounts[s] || 0) + 1; });
-  const stages = Object.keys(stageCounts).sort();
-  const counts = stages.map(s => stageCounts[s]);
-  const colors = stages.map(s => STAGE_COL[s] || '#9e9e9e');
-  const total = counts.reduce((a, b) => a + b, 0);
-  document.getElementById('leg-st').innerHTML = stages.map((s, i) =>
-    '<span class="legend-item"><span class="legend-dot" style="background:' + colors[i] + '"></span>' + s + ' (' + counts[i] + ')</span>'
-  ).join('');
-  if (chartSt) chartSt.destroy();
-  chartSt = new Chart(document.getElementById('chartSt'), {
-    type: 'doughnut',
-    data: { labels: stages, datasets: [{ data: counts, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }] },
-    options: {
-      responsive: true, maintainAspectRatio: false, cutout: '62%',
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ' ' + ctx.label + ': ' + ctx.raw + ' (' + Math.round(ctx.raw / total * 100) + '%)' } }
       }
     }
   });
@@ -632,7 +720,7 @@ function openMod(idx) {
       ii('Pareto Problem', r.Pareto_Problem || '-') +
       ii('Status Order', r.Status_Order || '-') +
     '</div>' +
-    '<div class="sku-box">' + '<div class="sku-box-lbl">SKU terkait (' + (r.skuRows ? r.skuRows.length : 0) + ')</div>' + (r.skuRows && r.skuRows.length   ? '<div style="overflow-x:auto"><table class="sku-tbl">'     + '<thead><tr><th>SKU</th><th class="r">Qty (Dus)</th><th>Reason</th></tr></thead>'     + '<tbody>'     + r.skuRows.map(function(s) {         var rsn = s.reason ? (s.reason.length > 100 ? s.reason.substring(0,100)+'...' : s.reason) : '-';         return '<tr>'           + '<td><span class="sku-code">' + s.sku + '</span></td>'           + '<td class="r">' + Math.round(s.qty).toLocaleString() + '</td>'           + '<td class="rsn">' + rsn + '</td>'           + '</tr>';       }).join('')     + '</tbody></table></div>'   : '<span class="no-r">Tidak ada SKU</span>') + '</div>' + '<div class="reason-box"><h5>Merged reason (' + rsns.length + ' entri)</h5>' +
+    '<div class="sku-box">' + '<div class="sku-box-lbl">SKU terkait (' + (r.skuRows ? r.skuRows.length : 0) + ')</div>' + (r.skuRows && r.skuRows.length   ? '<div style="overflow-x:auto"><table class="sku-tbl">'     + '<thead><tr><th>SKU</th><th>Plant</th><th class="r">Qty (Dus)</th><th>Reason</th></tr></thead>'     + '<tbody>'     + r.skuRows.map(function(s) {         var rsn = s.reason ? (s.reason.length > 100 ? s.reason.substring(0,100)+'...' : s.reason) : '-';         return '<tr>'           + '<td><span class="sku-code">' + s.sku + '</span></td>'           + '<td style="font-size:11px;color:#555;white-space:nowrap">' + (s.plant || '-') + '</td>'           + '<td class="r">' + Math.round(s.qty).toLocaleString() + '</td>'           + '<td class="rsn">' + rsn + '</td>'           + '</tr>';       }).join('')     + '</tbody></table></div>'   : '<span class="no-r">Tidak ada SKU</span>') + '</div>' + '<div class="reason-box"><h5>Merged reason (' + rsns.length + ' entri)</h5>' +
     (rsns.length ? rsns.map(re => '<div class="re">' + re.trim() + '</div>').join('') : '<p class="no-r">Tidak ada reason tercatat</p>') +
     '</div>';
   document.getElementById('modal-overlay').classList.add('open');
