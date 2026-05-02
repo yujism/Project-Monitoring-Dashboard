@@ -539,7 +539,7 @@ function renderCharts() {
 function renderParetoChart() {
   const el = document.getElementById('chartPareto');
   if (!el) return;
-  const data = curCh ? filtered : ALL;
+  const data = filtered;
   const chs  = [...new Set(ALL.map(r => r.CHANNEL))].sort();
   const agg  = {};
   chs.forEach(ch => { agg[ch] = { on: 0, dl: 0, nd: 0 }; });
